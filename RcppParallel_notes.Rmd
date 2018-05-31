@@ -1,0 +1,56 @@
+---
+title: "RcppParallel Notes"
+author: "Thomas W. Jones"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+This document contains notes to myself about learning RcppParallel.
+
+# Basic structure
+
+RcppParallel scripts have two main parts, a worker and the main function. The worker is a C++ "struct". The syntax for using it is kind of like a data type. The main function calls `parallelFor` using the struct to get parallel execution.
+
+The worker has the same basic interior format:
+
+1. Declare your input
+2. Declare your output
+3. Initialize both using a weird (but easy to copy) syntax
+4. Declare a "void" operator, inside of which the actual work happens
+5. (Optional) Join the result together
+
+An example worker is below
+
+```{rcpp eval = FALSE}
+struct myWorker : public Worker {
+  
+  // input to read from
+  const RVector<double> input;
+  
+  // output to write to
+  double output;
+  
+  // initialize input and output
+  Sum(const NumericVector input) : input(input), output(0) {}
+  Sum(const Sum& sum, Split) : input(sum.input), output(0) {} // what does this line do?
+  
+  // SquareRoot(const NumericMatrix input, NumericMatrix output) 
+  //   : input(input), output(output) {}
+
+  
+  // declare the operator
+     void operator()(std::size_t begin, std::size_t end) {
+      value += std::accumulate(input.begin() + begin, input.begin() + end, 0.0);
+   }
+  
+  // join result
+   void join(const Sum& rhs) { 
+      value += rhs.value; 
+};
+
+```
+
+
+
+
+# Additional Notes 
