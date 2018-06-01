@@ -1,42 +1,33 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 using std::string;
-using std::strtok;
 
-// [[Rcpp::plugins(cpp11)]]
 // This is a simple example of splitting a string on spaces
 
 // [[Rcpp::export]]
-
-Rcpp::RawVector split_string(const std::string &s, const char* delim, std::vector<std::string> & v){
-  // to avoid modifying original string
-  // first duplicate the original string and return a char pointer then free the memory
-  char * dup = strdup(s.c_str());
-  char * token = strtok(dup, delim);
-  while(token != NULL){
-    v.push_back(string(token));
-    // the call is treated as a subsequent calls to strtok:
-    // the function continues from where it left in previous invocation
-    token = strtok(NULL, delim);
-  }
-  free(dup);
+std::vector<std::string> split_string(const std::string str, const std::string delim = " "){
   
-  return token;
-}
-
-
-
-// std::vector<std::string> split_string(std::string x) {
-//   std::string s = x; // don't overwrite inputs
-//   
-//   char token ;
-//   
-//   std::vector<std::string> result {
-//     std::regex_token_iterator(s.begin(), s.end(), ws_re, -1), {}
-//   };  
-//   
-//   return result;
-// }
-
-
+  // initialize the output result
+  std::vector<std::string> tokens;
+  
+  // Skip delim at beginning.
+  string::size_type last_pos = str.find_first_not_of(delim, 0);
+  
+  // Find first "non-delimiter".
+  string::size_type pos = str.find_first_of(delim, last_pos);
+  
+  while (string::npos != pos || string::npos != last_pos)
+  {
+    // Found a token, add it to the vector.
+    tokens.push_back(str.substr(last_pos, pos - last_pos));
+    
+    // Skip delim.  Note the "not_of"
+    last_pos = str.find_first_not_of(delim, pos);
+    
+    // Find next "non-delimiter"
+    pos = str.find_first_of(delim, last_pos);
+  }
+  
+  return tokens;
+};
 
