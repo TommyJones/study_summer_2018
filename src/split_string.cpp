@@ -5,7 +5,10 @@ using std::string;
 // This is a simple example of splitting a string on spaces
 
 // [[Rcpp::export]]
-std::vector<std::string> split_string(const std::string str, const std::string delim = " "){
+std::vector<std::string> split_string(const std::string s, const std::string delim = " "){
+  
+  // don't overwrite inputs
+  std::string str = s;
   
   // initialize the output result
   std::vector<std::string> tokens;
