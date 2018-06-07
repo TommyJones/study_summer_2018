@@ -8,4 +8,9 @@
 
 "Special topics" - more than one student (for fall or spring next year)
 
+## 06/07/2018
+* look at hashing trick for DTM/TCM
+* Parallelize my parser
+* How do I count?
+* read LDA paper & write summary
 
