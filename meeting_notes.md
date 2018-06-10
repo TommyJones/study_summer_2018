@@ -9,6 +9,7 @@
 "Special topics" - more than one student (for fall or spring next year)
 
 ## 06/07/2018
+* email bill when I have something running and/or status update
 * look at hashing trick for DTM/TCM
 * Parallelize my parser
 * How do I count?
