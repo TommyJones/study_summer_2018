@@ -156,7 +156,7 @@ The plate diagram does help make the posterior more obvious:
 
 \begin{align}
   P(\mathbf{W}, \mathbf{Z}, \boldsymbol{\Theta}, \boldsymbol{\Phi}|\vec\alpha, \vec\beta)
-    &= \prod_{n=1}^{N_d}P(z_{d,n}|\theta_d) P(w_{d,n}|\phi_{z_{d,n}}) \cdot
+    &= \prod_{n=1}^{N_d} P(w_{d,n}|\phi_{z_{d,n}}) P(z_{d,n}|\theta_d) \cdot
       \prod_{d=1}^D P(\theta_d|\alpha) \cdot \prod_{k=1}^K P(\phi_k|\beta)
 \end{align}
 
