@@ -160,4 +160,39 @@ The plate diagram does help make the posterior more obvious:
       \prod_{d=1}^D P(\theta_d|\alpha) \cdot \prod_{k=1}^K P(\phi_k|\beta)
 \end{align}
 
+I'll convert the $P(x|y)$ notation above to the true distributions in the next section where we derive the formula for Gibbs sampling.
+
 # Collapsed Gibbs Sampling for LDA
+
+Gibbs sampling is a _Markov chian Monte Carlo_ method (MCMC). MCMC methods are designed to approximate the full posterior distribution by taking samples, rather than calculating it directly. There are several popular MCMC methods. The most well-known are the Metropolis-Hastings algorithm and the Gibbs algorithm. Gibbs generally has an advantage over Metropolis-Hastings in that it is usually faster. Yet, unlike Metropolis-Hastings, Gibbs can only be used when the marginal posteriors (holding all parameters constant except the one being sampled) conform to known distributions. This is often easily acheived by using conjugate distributions. The Gibbs algorithm proceeds iteratively. At each iteration, the current value of each parameter is estimated by holding all other parameters constant at their values at the last iteration. The Gibbs algorithm can be used to estimate the parameters of an LDA model.
+
+Gibbs sampling can be sped up by integrating out some of the parameters. (This is called "collapsing" or "collapsed Gibbs sampling".) Thus, there are fewer parameters to estimate, shortening each iteration. The collapsed sampler for LDA also generally converges faster. Because the priors over $\boldsymbol\Theta$ and $\boldsymbol\Phi$ are conjugate, these parameters can be iterated out to make a collapsed Gibbs sampler for LDA.
+
+Note: it seems to me that integrating out $\boldsymbol\Theta$ and $\boldsymbol\Phi$ has both theoretical and practical implications. The key parameters of interest are $\boldsymbol\Theta$ and $\boldsymbol\Phi$. Though, from a frequentist perspective, $\boldsymbol\theta_d$ should be proportional to $\mathbf{z}_d$, for example. This isn't truly Bayesian (the theoretical implication), and one has to do a post-sampling normalization (the practical implication).
+
+## Collapsing out $\boldsymbol\Theta$ and $\boldsymbol\Phi$
+
+When we integrate $\boldsymbol\Theta$ and $\boldsymbol\Phi$ out of $P(\mathbf{W}, \mathbf{Z}, \boldsymbol\Theta, \boldsymbol\Phi|\boldsymbol\alpha, \boldsymbol\beta)$, the result is $P(\mathbf{W}, \mathbf{Z}|\boldsymbol\alpha, \boldsymbol\beta)$. Let's disect that:
+
+By definition: 
+
+\begin{align}
+  P(\mathbf{W}, \mathbf{Z}|\boldsymbol\alpha, \boldsymbol\beta)
+    &= \frac{P(\mathbf W, \mathbf Z, \boldsymbol\alpha, \boldsymbol\beta)}
+      {P(\boldsymbol\alpha, \boldsymbol\beta)}\\
+    &= \frac{P(\mathbf W|\mathbf Z, \boldsymbol \alpha, \boldsymbol\beta)}
+      {P(\boldsymbol\alpha, \boldsymbol\beta)}\\
+    &= P(\mathbf Z|\boldsymbol\alpha, \boldsymbol\beta)
+      P(\mathbf W|\mathbf Z, \boldsymbol\alpha, \boldsymbol \beta)
+\end{align}
+
+And because $\mathbf Z$ is independent of $\boldsymbol\beta$ and $\mathbf W$ is independent of $\boldsymbol \alpha$,
+
+\begin{align}
+  P(\mathbf Z|\boldsymbol\alpha, \boldsymbol\beta) 
+    P(\mathbf W|\mathbf Z, \boldsymbol\alpha, \boldsymbol \beta)
+    &= P(\mathbf Z|\boldsymbol \alpha)P(\mathbf W|\mathbf Z, \boldsymbol\beta)
+\end{align}
+
+We can focus on $P(\mathbf Z|\boldsymbol \alpha)$ and $P(\mathbf W|\mathbf Z, \boldsymbol\beta)$ independently.
+
