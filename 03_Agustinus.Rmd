@@ -25,6 +25,27 @@ X <- rbind(c(0, 0, 1, 2, 2),
            c(3, 3, 4, 4, 4),
            c(3, 4, 4, 4, 4))
 
-### Initialize 
+W <- seq_len(ncol(X))
+
+N_d = nrow(X)  # num of docs
+N_w = length(W)  # num of words
+N_k = 2  # num of topics
+
+### Initialize parameters ----
+set.seed(8675309)
+
+alpha <- rep(1, N_k)
+gamma <- rep(1, N_w) # I usually call this "beta"
+
+# Z := word topic assignment, initialized with random integers
+# This would have to be a triplet or other sparse matrix
+Z <- matrix(sample.int(10, N_w * N_d, replace = TRUE), ncol = N_w, nrow = N_d)
+
+# Pi := document topic distribution
+Pi <- gtools::rdirichlet(N_d, alpha)
+
+# B := word topic distribution
+B <- gtools::rdirichlet(N_k, gamma)
+
 ```
 
