@@ -1,0 +1,30 @@
+---
+title: "Summary of Agustinus’s Gibbs Sampler"
+author: "Thomas W. Jones"
+date: "7/25/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a summary of a blog post on LDA Gibbs sampling and a quick R implmentation of it. The post and Python code can be found here:  [https://wiseodd.github.io/techblog/2017/09/07/lda-gibbs/](https://wiseodd.github.io/techblog/2017/09/07/lda-gibbs/). I have also saved a PDF copy of the page as I found it on 7/25/2018 in /readings/02_lda/other_ref/. 
+
+# Defining the model
+
+# Implemented code
+
+```{r}
+### Declare some toy data ----
+# document term matrix of word counts
+X <- rbind(c(0, 0, 1, 2, 2),
+           c(0, 0, 1, 1, 1),
+           c(0, 1, 2, 2, 2),
+           c(4, 4, 4, 4, 4),
+           c(3, 3, 4, 4, 4),
+           c(3, 4, 4, 4, 4))
+
+### Initialize 
+```
+
