@@ -69,6 +69,7 @@ gamma <- rep(1, N_w) # I usually call this "beta"
 # Z := word topic assignment, initialized with random integers
 # This would have to be a triplet or other sparse matrix
 Z <- matrix(sample.int(10, N_w * N_d, replace = TRUE), ncol = N_w, nrow = N_d)
+# Z <- matrix(0, ncol = N_w, nrow = N_d)
 
 # Pi := document topic distribution
 Pi <- gtools::rdirichlet(N_d, alpha)
