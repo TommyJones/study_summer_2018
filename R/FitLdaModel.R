@@ -83,7 +83,7 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
     stop("alpha must be a numeric scalar or vector with no missing values")
   
   if (length(alpha) == 1) {
-    alpha <- rep(alpha, k)
+    alpha <- numeric(k) + alpha
   } else if (length(alpha) != k){
     stop("alpha must be a scalar or vector of length k")
   }
@@ -92,7 +92,7 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
     stop("beta must be a numeric scalar or vector with no missing values")
   
   if (length(beta) == 1) {
-    beta <- rep(beta, ncol(dtm))
+    beta <- numeric(ncol(dtm)) + beta
   } else if (length(beta) != ncol(dtm)){
     stop("beta must be a scalar or vector of length ncol(dtm)")
   }
@@ -112,7 +112,7 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   Nd <- nrow(dtm)
   
-  Nk <- 2
+  Nk <- k
   
   Nv <- ncol(dtm)
   
@@ -130,13 +130,13 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   ### Assign initial values ----
   
   for (d in seq_along(docs)) {
-    for (v in seq_along(docs[[d]])) {
+    for (n in seq_along(docs[[d]])) {
       
       z <- sample(seq_len(Nk), 1) # sample a topic
       
-      z_dn[[d]][v] <- z # word-topic assignment for the document
+      z_dn[[d]][n] <- z # word-topic assignment for the document
       
-      phi_counts[z, docs[[d]][v]] <- phi_counts[z, docs[[d]][v]] + 1 # count that word and topic
+      phi_counts[z, docs[[d]][n]] <- phi_counts[z, docs[[d]][n]] + 1 # count that word and topic
       
       # This is different from Andrew's, check to see if they calculate the same
       theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
@@ -151,12 +151,12 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   ### Gibbs iterations ----
   for (i in seq_len(iterations)) {
     for (d in seq_along(docs)) {
-      for (v in seq_along(docs)[[d]]) {
+      for (n in seq_along(docs)[[d]]) {
         
         # Get current values
-        w <- docs[[d]][v] # index of the current word
+        w <- docs[[d]][n] # index of the current word
         
-        z <- z_dn[[d]][v] # topic assignment of the current word
+        z <- z_dn[[d]][n] # topic assignment of the current word
         
         # discount current values from sampling
         theta_counts[d,z] <- theta_counts[d,z] - 1
