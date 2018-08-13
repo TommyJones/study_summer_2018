@@ -208,7 +208,8 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   ### return the result ----
   
-  result <- list(phi = phi, theta = theta, dtm = dtm) # add other things here
+  result <- list(phi = phi, theta = theta, 
+                 dtm = dtm, alpha = alpha, beta = beta) # add other things here
   
   class(result) <- c("LDA", "TopicModel")
   
