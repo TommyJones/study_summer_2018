@@ -34,7 +34,11 @@ iterations <- 1000
 
 alpha <- numeric(Nk) + 1
 
-beta <- numeric(Nv) + 0.001
+beta <- numeric(Nv) + 1
+
+sum_alpha <- sum(alpha)
+
+k_beta <- Nk * beta
 
 ################################################################################
 # Prototype collapsed gibbs sampler
@@ -104,9 +108,9 @@ while (it < iterations) { #  | ! converge
       n_d[d] <- n_d[d] - 1
       
       # sample topic index
-      d_a <- sum(theta_counts[d,] + alpha) # n_d[d] + Nk * alpha # 
+      d_a <- n_d[d] + sum_alpha # sum(theta_counts[d,] + alpha) # n_d[d] + Nk * alpha # 
       
-      d_b <- rowSums(phi_counts + beta[docs[[d]][n]]) # n_z[z] + Nv *  beta[docs[[d]][n]]# 
+      d_b <- n_z + k_beta[docs[[d]][n]] # rowSums(phi_counts + beta[docs[[d]][n]]) # n_z[z] + Nv *  beta[docs[[d]][n]]# 
       
       p_z <- (phi_counts[,docs[[d]][n]] + beta[docs[[d]][n]]) / (d_b) * (theta_counts[d,] + alpha) / (d_a)
       
@@ -115,7 +119,7 @@ while (it < iterations) { #  | ! converge
       # update counts
       theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
       
-      # n_d[d] <- n_d[d] + 1 # count that topic in that document overall
+      n_d[d] <- n_d[d] + 1 # count that topic in that document overall
       
       z_dn[[d]][n] <- z
       
