@@ -117,32 +117,35 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   Nv <- ncol(dtm)
   
   ### Declare data structures ----
-  z_dn <- lapply(docs, function(x) x * 0) # count of topic/term assignments by document, ta
+  z_dn <- lapply(docs, function(x) x * 0) # count of topic/term assignments by document, z_m_n
   
   theta_counts <- matrix(0, nrow = Nd, ncol = Nk) # count of topics over documents, n_m_z
   
-  phi_counts <- matrix(0, nrow = Nk, ncol = Nv) # count of terms over topics, wt
+  phi_counts <- matrix(0, nrow = Nk, ncol = Nv) # count of terms over topics, n_z_t
   
-  # n_d <- numeric(Nd) # count of term totals, I don;t know that I need this...
+  n_d <- numeric(Nd) # count of term totals, I don;t know that I need this...
   
   n_z <- numeric(Nk) # count of topic totals
   
   ### Assign initial values ----
   
-  for (d in seq_along(docs)) {
-    for (n in seq_along(docs[[d]])) {
+  for (d in seq_along(docs)) { # for every document
+    for (n in seq_along(docs[[d]])) { # for every word in that document
       
-      z <- sample(seq_len(Nk), 1) # sample a topic
+      z <- sample(seq_len(Nk), 1) # sample a topic at random
       
-      z_dn[[d]][n] <- z # word-topic assignment for the document
-      
-      phi_counts[z, docs[[d]][n]] <- phi_counts[z, docs[[d]][n]] + 1 # count that word and topic
-      
-      # This is different from Andrew's, check to see if they calculate the same
       theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
       
+      n_d[d] <- n_d[d] + 1 # count that topic in that document overall
+      
+      z_dn[[d]][n] <- z # count that topic for that word in the document
+      
+      phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] + 1 # count that word and topic
+      
+      n_z[z] <- n_z[z] + 1 # count the that topic overall
     }
   }
+  
   
   
   ### Burn in iterations ----
@@ -150,34 +153,40 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   ### Gibbs iterations ----
   for (i in seq_len(iterations)) {
+    # for each document
     for (d in seq_along(docs)) {
-      for (n in seq_along(docs)[[d]]) {
+      # for each word in that document
+      for (n in seq_along(docs[[d]])) {
+        # discount for the n-th word with topic z
+        z <- z_dn[[d]][n]
         
-        # Get current values
-        w <- docs[[d]][n] # index of the current word
-        
-        z <- z_dn[[d]][n] # topic assignment of the current word
-        
-        # discount current values from sampling
         theta_counts[d,z] <- theta_counts[d,z] - 1
         
-        phi_counts[z,w] <- phi_counts[z,w] - 1
+        phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] - 1
         
-        # sample a new topic
-        d_a <- sum(theta_counts[d,] + alpha)
+        n_z[z] <- n_z[z] - 1
         
-        d_b <- rowSums(phi_counts + beta[w])
+        n_d[d] <- n_d[d] - 1
         
-        p_z <- (phi_counts[,w] + beta[w]) / (d_b) * (theta_counts[d,] + alpha) / (d_a)
+        # sample topic index
+        d_a <- n_d[d] + sum_alpha # sum(theta_counts[d,] + alpha) # n_d[d] + Nk * alpha # 
+        
+        d_b <- n_z + k_beta[docs[[d]][n]] # rowSums(phi_counts + beta[docs[[d]][n]]) # n_z[z] + Nv *  beta[docs[[d]][n]]# 
+        
+        p_z <- (phi_counts[,docs[[d]][n]] + beta[docs[[d]][n]]) / (d_b) * (theta_counts[d,] + alpha) / (d_a)
         
         z <- sample(seq_len(Nk), 1, prob = p_z)
         
-        # update topic assignments
+        # update counts
         theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
+        
+        n_d[d] <- n_d[d] + 1 # count that topic in that document overall
         
         z_dn[[d]][n] <- z
         
         phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] + 1 # count that word and topic
+        
+        n_z[z] <- n_z[z] + 1 # count the word in that topic overall
         
       }
     }
