@@ -1,9 +1,13 @@
 
 
 predict.LDA <- function(object, newdata, method = c("gibbs", "dot"), 
-                        iterations = NULL, seed = NULL, ...) {
+                        iterations = NULL, burnin = -1, seed = NULL, ...) {
   
   ### Check inputs ----
+  if (burnin >= iterations) {
+    stop("burnin must be less than iterations")
+  }
+  
   if (sum(c("LDA", "TopicModel") %in% class(object)) < 2) {
     stop("object must be a topic model object of class c('LDA', 'TopicModel')")
   }
@@ -64,6 +68,10 @@ predict.LDA <- function(object, newdata, method = c("gibbs", "dot"),
     
     n_d <- numeric(Nd) # count of term totals
     
+    if (burnin > -1) {
+      theta_sums <- matrix(0, nrow = Nd, ncol = Nk) # average over iterations
+    }
+    
     # random inital values
     for (d in seq_along(docs)) {
       for (n in seq_along(docs[[d]])) {
@@ -105,14 +113,23 @@ predict.LDA <- function(object, newdata, method = c("gibbs", "dot"),
           
           z_dn[[d]][n] <- z
           
+          if (burnin > -1 & iterations >= burnin)
+            theta_sums <- theta_sums + theta_counts
+          
         }
       }
     }
     
     # format result
-    theta <- t(t(theta_counts) + object$alpha)
+    if (burnin > -1) {
+      theta <- theta_sums / (iterations - burnin)
+    } else {
+      theta <- theta_counts
+    }
     
-    theta <- theta_counts / rowSums(theta_counts, na.rm = TRUE)
+    theta <- t(t(theta) + object$alpha)
+    
+    theta <- theta / rowSums(theta, na.rm = TRUE)
     
     theta[ is.na(theta) ] <- 0
     

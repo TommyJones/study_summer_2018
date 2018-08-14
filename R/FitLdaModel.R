@@ -32,7 +32,7 @@ Dtm2Lexicon <- function(dtm, ...) {
   # out
   
   # above is real code, but I have C++ stuff to sort out
-  docs <- apply(X, 1, function(x){
+  docs <- apply(dtm, 1, function(x){
     out <- c()
     for (j in seq_along(x)) {
       out <- c(out, rep(j, x[j]))
@@ -53,16 +53,21 @@ Dtm2Lexicon <- function(dtm, ...) {
 #'        future version may include automatic stopping criteria.
 #' @param seed If not null (the default) then the random seed you wish to set
 #' @param ... Other arguments to be passed to textmineR::TmParallelApply
-FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05, 
+FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, beta = 0.05, 
                         seed = NULL, ...){
   
   ### Check inputs are of correct dimensionality ----
+  
+  # iterations and burnin acceptable?
+  if (burnin >= iterations) {
+    stop("burnin must be less than iterations")
+  }
   
   # dtm of the correct format?
   if (! "dgCMatrix" %in% class(dtm)) {
     message("dtm is not of class dgCMatrix, attempting to convert...")
     
-    dtm <- try(methods::as(dtm, "dgCMatrix", strict = TRUE))
+    dtm <- try(methods::as(dtm, "dgCMatrix", strict = TRUE)) # requires Matrix in namespace
     
     if (! "dgCMatrix" %in% class(dtm))
       stop("conversion failed. Please pass an object of class dgCMatrix for dtm")
@@ -131,6 +136,13 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   n_z <- numeric(Nk) # count of topic totals
   
+  if (burnin > -1) {
+    theta_sums <- matrix(0, nrow = Nd, ncol = Nk) # initialize matrix for averaging over iterations
+    
+    phi_sums <- matrix(0, nrow = Nk, ncol = Nv) # initialize matrix for averaging over iterations
+  }
+  
+  
   ### Assign initial values ----
   
   for (d in seq_along(docs)) { # for every document
@@ -150,10 +162,6 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
     }
   }
   
-  
-  
-  ### Burn in iterations ----
-  # this is going to take some figuring out...
   
   ### Gibbs iterations ----
   for (i in seq_len(iterations)) {
@@ -192,21 +200,38 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
         
         n_z[z] <- n_z[z] + 1 # count the word in that topic overall
         
+        if (burnin > -1 & i >= burnin) { # if we use burnin, we average over the chain
+          theta_sums <- theta_sums + theta_counts
+          
+          phi_sums <- phi_sums + phi_counts
+        }
+        
       }
     }
   }
   
   ### Format posteriors correctly ----
   # calculate output parameters
-  phi <- t(t(phi_counts) + beta)
+  if (burnin > -1) {
+    theta <- theta_sums / (iterations - burnin)
+    
+    phi <- phi_sums / (iterations - burnin)
+  } else {
+    theta <- theta_counts
+    
+    phi <- phi_counts
+  }
   
-  phi <- phi_counts / rowSums(phi_counts, na.rm = TRUE)
+  
+  phi <- t(t(phi) + beta)
+  
+  phi <- phi / rowSums(phi, na.rm = TRUE)
   
   phi[ is.na(phi) ] <- 0
   
-  theta <- t(t(theta_counts) + alpha)
+  theta <- t(t(theta) + alpha)
   
-  theta <- theta_counts / rowSums(theta_counts, na.rm = TRUE)
+  theta <- theta / rowSums(theta, na.rm = TRUE)
   
   theta[ is.na(theta) ] <- 0
   
