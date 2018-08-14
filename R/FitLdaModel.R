@@ -116,6 +116,10 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   Nv <- ncol(dtm)
   
+  sum_alpha <- sum(alpha)
+  
+  k_beta <- Nk * beta
+  
   ### Declare data structures ----
   z_dn <- lapply(docs, function(x) numeric(length(x))) # count of topic/term assignments by document, z_m_n
   
@@ -205,6 +209,14 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   theta <- theta_counts / rowSums(theta_counts, na.rm = TRUE)
   
   theta[ is.na(theta) ] <- 0
+  
+  colnames(phi) <- colnames(dtm)
+  
+  rownames(phi) <- paste0("t_", seq_len(Nk))
+  
+  colnames(theta) <- rownames(phi)
+  
+  rownames(theta) <- rownames(dtm)
   
   ### return the result ----
   
