@@ -30,7 +30,7 @@ predict.LDA <- function(object, newdata, method = c("gibbs", "dot"),
     dtm_newdata <- newdata
   } else {
     # code to convert goes here
-    stop("newdata not of class dgCMatrix is not yet supported")
+    stop("newdata not of class character is not yet supported")
   }
   
   ### Align vocabulary ----
