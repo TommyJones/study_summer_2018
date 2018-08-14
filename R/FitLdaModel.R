@@ -117,13 +117,13 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   Nv <- ncol(dtm)
   
   ### Declare data structures ----
-  z_dn <- lapply(docs, function(x) x * 0) # count of topic/term assignments by document, z_m_n
+  z_dn <- lapply(docs, function(x) numeric(length(x))) # count of topic/term assignments by document, z_m_n
   
   theta_counts <- matrix(0, nrow = Nd, ncol = Nk) # count of topics over documents, n_m_z
   
   phi_counts <- matrix(0, nrow = Nk, ncol = Nv) # count of terms over topics, n_z_t
   
-  n_d <- numeric(Nd) # count of term totals, I don;t know that I need this...
+  n_d <- numeric(Nd) # count of term totals
   
   n_z <- numeric(Nk) # count of topic totals
   
@@ -208,7 +208,10 @@ FitLdaModel <- function(dtm, k, iterations = NULL, alpha = 0.1, beta = 0.05,
   
   ### return the result ----
   
-  result <- list(phi = phi, theta = theta, 
+  gamma <- textmineR::CalcPhiPrime(phi = phi, theta = theta, 
+                                   p_docs = Matrix::rowSums(dtm))
+  
+  result <- list(phi = phi, theta = theta, gamma = gamma,
                  dtm = dtm, alpha = alpha, beta = beta) # add other things here
   
   class(result) <- c("LDA", "TopicModel")
