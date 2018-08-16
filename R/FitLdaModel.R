@@ -200,13 +200,13 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
         
         n_z[z] <- n_z[z] + 1 # count the word in that topic overall
         
-        if (burnin > -1 & i >= burnin) { # if we use burnin, we average over the chain
-          theta_sums <- theta_sums + theta_counts
-          
-          phi_sums <- phi_sums + phi_counts
-        }
         
       }
+    }
+    if (burnin > -1 & i >= burnin) { # if we use burnin, we average over the chain
+      theta_sums <- theta_sums + theta_counts
+      
+      phi_sums <- phi_sums + phi_counts
     }
   }
   
