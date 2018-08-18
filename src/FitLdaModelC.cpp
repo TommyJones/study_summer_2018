@@ -136,6 +136,7 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
           phi_sums(k,v) = phi_sums(k,v) + phi_counts(k,v);
         }
       }
+      
     }
     
   }
@@ -156,12 +157,11 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
         theta(d,k) = (theta_sums(d,k) / i_diff);
       }
       
-      for (int v; v < Nv; v++) {
+      for (int v = 0; v < Nv; v++) {
         phi(k,v) = (phi_sums(k,v) / i_diff);
       }
-      
     }
-    
+
     return List::create(Named("theta") = theta,
                         Named("phi") = phi);
     
@@ -172,4 +172,38 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   
 }
 
+/*** R
+X <- rbind(c(0, 0, 1, 2, 2),
+           c(0, 0, 1, 1, 1),
+           c(0, 1, 2, 2, 2),
+           c(4, 4, 4, 0, 0),
+           c(3, 3, 4, 0, 0),
+           c(3, 4, 4, 1, 0))
+  
+  
+docs <- apply(X, 1, function(x){
+  out <- c()
+  for (j in seq_along(x)) {
+    out <- c(out, rep(j, x[j]))
+  }
+  out
+})
+  
+Nd <- nrow(X)
 
+Nk <- 2
+
+Nv <- ncol(X)
+
+alpha <- numeric(Nk) + .1
+
+beta <- numeric(Nv) + .1
+
+iterations <- 1000
+
+burnin = -1
+
+# m <- lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, alpha = alpha, beta = beta,
+#            iterations = iterations, burnin = burnin)
+#
+*/
