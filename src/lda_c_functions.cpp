@@ -9,47 +9,55 @@ using namespace Rcpp;
 // Pre-processing and post-processing is assumed in R
 
 // [[Rcpp::export]]
-List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha, 
-           NumericVector beta, int iterations, int burnin) {
-  std::cout << "butts\n";
+List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha, 
+               NumericVector beta, int iterations, int burnin) {
+  
+  // print a status so we can see where we are
+  std::cout << "declaring variables\n";
+  
   // Declare some initial variables
   double sum_alpha = sum(alpha); // rcpp sugar here, I guess
-  
+
   NumericVector k_beta = beta * Nk; // rcpp sugar here, I guess
-  
+
   // Declare data structures
+  int i, d, n, k; // indices for loops
+  
   NumericVector p_z(Nk);
   
-  int z = 0; // placeholder for topic sampled
-  
-  int v = 0; // placeholder for word index
-  
-  IntegerVector topic_sample = seq_len(Nk) -1;
-  
-  List z_dn(Nd) ; // count of topic/term assignments by document
-  
-  IntegerMatrix theta_counts(Nd, Nk); // count of topics over documents
-  
-  IntegerMatrix phi_counts(Nk, Nv); // count of terms over topics
-  
-  IntegerVector n_d(Nd); // total count of term document totals
-  
-  IntegerVector n_z(Nk); // total count of topic totals
-  
-  IntegerMatrix theta_sums(Nd, Nk); // initialize matrix for averaging over iterations
-  
-  IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations
+  IntegerVector z1; // placeholder for topic sampled
 
+  int z = 0; // placeholder for topic sampled
+
+  int v = 0; // placeholder for word index
+
+  IntegerVector topic_sample = seq_len(Nk) -1;
+
+  List z_dn(Nd) ; // count of topic/term assignments by document
+
+  IntegerMatrix theta_counts(Nd, Nk); // count of topics over documents
+
+  IntegerMatrix phi_counts(Nk, Nv); // count of terms over topics
+
+  IntegerVector n_d(Nd); // total count of term document totals
+
+  IntegerVector n_z(Nk); // total count of topic totals
+
+  IntegerMatrix theta_sums(Nd, Nk); // initialize matrix for averaging over iterations
+
+  IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations
+  
   // Assign initial values at random
-  for(int d = 0; d < docs.length(); d++){
+  std::cout << "assigning initial values \n";
+  
+  for(d = 0; d < docs.length(); d++){
     IntegerVector doc = docs[d];
     
     IntegerVector z_dn_row(doc.length());
     
-    for(int n = 0; n < doc.length(); n++){
+    for(n = 0; n < doc.length(); n++){
       
       // sample a topic at random
-
       z = rand() % Nk;
       
       theta_counts(d,z) = theta_counts(d,z) + 1;
@@ -70,17 +78,18 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
     
   }
   
-  
   // Gibbs iterations
-  for (int i = 0; i < iterations; i++) { // for each iteration
+  std::cout << "beginning Gibbs \n";
+  for (i = 0; i < iterations; i++) { // for each iteration
     
-    for (int d = 0; d < Nd; d++) { // for each document
+    for (d = 0; d < Nd; d++) { // for each document
+      std::cout << "document " << d << "\n";
       
       IntegerVector doc = docs[d]; // placeholder for a document
       
       IntegerVector z_dn_row = z_dn[d]; // placeholder for doc-word-topic assigment
       
-      for (int n = 0; n < doc.length(); n++) { // for each word in that document
+      for (n = 0; n < doc.length(); n++) { // for each word in that document
         
         // discount for the n-th word with topic z
         z = z_dn_row[n];
@@ -94,7 +103,7 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
         n_d[d] = n_d[d] - 1;
         
         // sample topic index
-        for (int k = 0; k < Nk; k++) {
+        for (k = 0; k < Nk; k++) {
           
           p_z[k] = (phi_counts(k,doc[n]) + beta[doc[n]]) / (n_z[k] + k_beta[doc[n]]) *
             (theta_counts(d,k) + alpha[k]) / (n_d[d] + sum_alpha);
@@ -123,13 +132,13 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
     // if using burnin, update sums
     if (burnin > -1 && i >= burnin) {
       
-      for (int k = 0; k < Nk; k++) {
+      for (k = 0; k < Nk; k++) {
         
-        for (int d = 0; d < Nd; d++) {
+        for (d = 0; d < Nd; d++) {
           theta_sums(d,k) = theta_sums(d,k) + theta_counts(d,k);
         }
         
-        for (int v = 0; v < Nv; v++) {
+        for (v = 0; v < Nv; v++) {
           phi_sums(k,v) = phi_sums(k,v) + phi_counts(k,v);
         }
       }
@@ -139,7 +148,8 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   }
   
   // return the result
-
+  std::cout << "prepare result\n";
+  
   if (burnin > -1) {
     int i_diff = iterations - burnin;
     
@@ -148,17 +158,17 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
     NumericMatrix phi(Nk,Nv);
     
     // average over chain after burnin 
-    for (int k = 0; k < Nk; k++) {
+    for (k = 0; k < Nk; k++) {
       
-      for (int d = 0; d < Nd; d++) {
+      for (d = 0; d < Nd; d++) {
         theta(d,k) = (theta_sums(d,k) / i_diff);
       }
       
-      for (int v = 0; v < Nv; v++) {
+      for (v = 0; v < Nv; v++) {
         phi(k,v) = (phi_sums(k,v) / i_diff);
       }
     }
-
+    
     return List::create(Named("theta") = theta,
                         Named("phi") = phi);
     
@@ -166,6 +176,7 @@ List lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
     return List::create(Named("theta") = theta_counts,
                         Named("phi") = phi_counts);
   }
+  
   
 }
 
@@ -178,21 +189,21 @@ X <- rbind(c(0, 0, 1, 2, 2),
            c(3, 4, 4, 1, 0))
   
   
-docs <- apply(X, 1, function(x){
-  out <- c()
-  for (j in seq_along(x)) {
-    out <- c(out, rep(j, x[j]))
-  }
-  out
-})
+  docs <- apply(X, 1, function(x){
+    out <- c()
+    for (j in seq_along(x)) {
+      out <- c(out, rep(j, x[j]))
+    }
+    out
+  })
   
-Nd <- nrow(X)
-
-Nk <- 2
+  Nd <- nrow(X)
+  
+  Nk <- 2
 
 Nv <- ncol(X)
-
-alpha <- numeric(Nk) + .1
+  
+  alpha <- numeric(Nk) + .1
 
 beta <- numeric(Nv) + .1
 
@@ -200,7 +211,8 @@ iterations <- 1000
 
 burnin = -1
 
-# m <- lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, alpha = alpha, beta = beta,
-#            iterations = iterations, burnin = burnin)
-#
+m <- fit_lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, alpha = alpha, beta = beta,
+           iterations = iterations, burnin = burnin)
+
 */
+
