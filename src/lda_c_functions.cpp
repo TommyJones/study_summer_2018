@@ -13,7 +13,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
                NumericVector beta, int iterations, int burnin) {
   
   // print a status so we can see where we are
-  std::cout << "declaring variables\n";
+  //std::cout << "declaring variables\n";
   
   // Declare some initial variables
   double sum_alpha = sum(alpha); // rcpp sugar here, I guess
@@ -48,7 +48,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations
   
   // Assign initial values at random
-  std::cout << "assigning initial values \n";
+  //std::cout << "assigning initial values \n";
   
   for(d = 0; d < docs.length(); d++){
     IntegerVector doc = docs[d];
@@ -79,11 +79,11 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   }
   
   // Gibbs iterations
-  std::cout << "beginning Gibbs \n";
+  //std::cout << "beginning Gibbs \n";
   for (i = 0; i < iterations; i++) { // for each iteration
     
     for (d = 0; d < Nd; d++) { // for each document
-      std::cout << "document " << d << "\n";
+      //std::cout << "document " << d << "\n";
       
       IntegerVector doc = docs[d]; // placeholder for a document
       
@@ -114,7 +114,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
         // update counts
         z1 = RcppArmadillo::sample(topic_sample, 1, false, p_z);
         
-        z = z1[1];
+        z = z1[0];
         
         theta_counts(d,z) = theta_counts(d,z) + 1; // update document topic count
         
@@ -148,7 +148,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   }
   
   // return the result
-  std::cout << "prepare result\n";
+  //std::cout << "prepare result\n";
   
   if (burnin > -1) {
     int i_diff = iterations - burnin;
