@@ -263,5 +263,15 @@ m <- FitLdaModel(dtm = dtm,
                  calc_r2 = TRUE,
                  seed = 1234)
   
+
+microbenchmark::microbenchmark(FitLdaModel(dtm = dtm, 
+                                           k = k, 
+                                           iterations = 100,
+                                           burnin = -1,
+                                           alpha = alpha, 
+                                           beta = beta,
+                                           calc_coherence = FALSE,
+                                           calc_r2 = FALSE,
+                                           seed = 1234))
 */
 
