@@ -273,5 +273,6 @@ microbenchmark::microbenchmark(FitLdaModel(dtm = dtm,
                                            calc_coherence = FALSE,
                                            calc_r2 = FALSE,
                                            seed = 1234), times = 10)
+
 */
 
