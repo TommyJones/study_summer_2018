@@ -15,9 +15,11 @@ Dtm2Lexicon <- function(dtm, ...) {
 
     dtm_list <- lapply(batches, function(x) dtm[ x:min(x + 2999, nrow(dtm)) , ])
 
-    out <-TmParallelApply(X = dtm_list, FUN = function(y){
+    out <-textmineR::TmParallelApply(X = dtm_list, FUN = function(y){
       dtm_to_lexicon_c(x = y)
     }, ...)
+    
+    out <- do.call(c, out)
 
   }else{
     out <- dtm_to_lexicon_c(x = dtm)
