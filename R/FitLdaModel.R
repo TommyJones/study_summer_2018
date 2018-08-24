@@ -7,40 +7,26 @@
 
 
 Dtm2Lexicon <- function(dtm, ...) {
-  # # get doc lengths
-  # doc_lengths <- Matrix::rowSums(dtm)
-  # 
-  # # do in parallel in batches of about 3000 if we have more than 3000 docs
-  # if(nrow(dtm) > 3000){
-  #   
-  #   batches <- seq(1, nrow(dtm), by = 3000)
-  #   
-  #   dtm_list <- lapply(batches, function(x) dtm[ x:min(x + 2999, nrow(dtm)) , ])
-  #   
-  #   out <-TmParallelApply(X = dtm_list, FUN = function(x){
-  #     Dtm2LexiconC(dtm = x, doc_lengths = doc_lengths)
-  #   }, ...)
-  #   
-  # }else{
-  #   out <- Dtm2LexiconC(dtm = dtm, doc_lengths = doc_lengths)
-  # }
-  # 
-  # out <- unlist(out)
-  # 
-  # names(out) <- rownames(dtm)
-  # 
-  # out
+
+  # do in parallel in batches of about 3000 if we have more than 3000 docs
+  if(nrow(dtm) > 3000){
+
+    batches <- seq(1, nrow(dtm), by = 3000)
+
+    dtm_list <- lapply(batches, function(x) dtm[ x:min(x + 2999, nrow(dtm)) , ])
+
+    out <-TmParallelApply(X = dtm_list, FUN = function(y){
+      dtm_to_lexicon_c(x = y)
+    }, ...)
+
+  }else{
+    out <- dtm_to_lexicon_c(x = dtm)
+  }
+
+  names(out) <- rownames(dtm)
+
+  out
   
-  # above is real code, but I have C++ stuff to sort out
-  docs <- apply(dtm, 1, function(x){
-    out <- c()
-    for (j in seq_along(x)) {
-      out <- c(out, rep(j, x[j]))
-    }
-    out
-  })
-  
-  docs
 }
 
 #' @param dtm A document term matrix of class dgCMatrix
@@ -54,7 +40,7 @@ Dtm2Lexicon <- function(dtm, ...) {
 #' @param seed If not null (the default) then the random seed you wish to set
 #' @param ... Other arguments to be passed to textmineR::TmParallelApply
 FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, beta = 0.05, 
-                        seed = NULL, ...){
+                        calc_coherence = TRUE, calc_r2 = FALSE, seed = NULL, ...){
   
   ### Check inputs are of correct dimensionality ----
   
@@ -110,6 +96,12 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
     }
   }
   
+  if (! is.logical(calc_coherence))
+    stop("calc_coherence must be logical")
+  
+  if (! is.logical(calc_r2))
+    stop("calc_r2 must be logical")
+  
   
   ### Format inputs ----
   
@@ -120,108 +112,19 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   Nk <- k
   
   Nv <- ncol(dtm)
+
+  ### run C++ gibbs sampler ----
   
-  sum_alpha <- sum(alpha)
+  result <- fit_lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, 
+                      alpha = alpha, beta = beta,
+                      iterations = iterations, burnin = burnin)
   
-  k_beta <- Nk * beta
-  
-  ### Declare data structures ----
-  z_dn <- lapply(docs, function(x) numeric(length(x))) # count of topic/term assignments by document, z_m_n
-  
-  theta_counts <- matrix(0, nrow = Nd, ncol = Nk) # count of topics over documents, n_m_z
-  
-  phi_counts <- matrix(0, nrow = Nk, ncol = Nv) # count of terms over topics, n_z_t
-  
-  n_d <- numeric(Nd) # count of term totals
-  
-  n_z <- numeric(Nk) # count of topic totals
-  
-  if (burnin > -1) {
-    theta_sums <- matrix(0, nrow = Nd, ncol = Nk) # initialize matrix for averaging over iterations
-    
-    phi_sums <- matrix(0, nrow = Nk, ncol = Nv) # initialize matrix for averaging over iterations
-  }
-  
-  
-  ### Assign initial values ----
-  
-  for (d in seq_along(docs)) { # for every document
-    for (n in seq_along(docs[[d]])) { # for every word in that document
-      
-      z <- sample(seq_len(Nk), 1) # sample a topic at random
-      
-      theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
-      
-      n_d[d] <- n_d[d] + 1 # count that topic in that document overall
-      
-      z_dn[[d]][n] <- z # count that topic for that word in the document
-      
-      phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] + 1 # count that word and topic
-      
-      n_z[z] <- n_z[z] + 1 # count the that topic overall
-    }
-  }
-  
-  
-  ### Gibbs iterations ----
-  for (i in seq_len(iterations)) {
-    # for each document
-    for (d in seq_along(docs)) {
-      # for each word in that document
-      for (n in seq_along(docs[[d]])) {
-        # discount for the n-th word with topic z
-        z <- z_dn[[d]][n]
-        
-        theta_counts[d,z] <- theta_counts[d,z] - 1
-        
-        phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] - 1
-        
-        n_z[z] <- n_z[z] - 1
-        
-        n_d[d] <- n_d[d] - 1
-        
-        # sample topic index
-        d_a <- n_d[d] + sum_alpha # sum(theta_counts[d,] + alpha) # n_d[d] + Nk * alpha # 
-        
-        d_b <- n_z + k_beta[docs[[d]][n]] # rowSums(phi_counts + beta[docs[[d]][n]]) # n_z[z] + Nv *  beta[docs[[d]][n]]# 
-        
-        p_z <- (phi_counts[,docs[[d]][n]] + beta[docs[[d]][n]]) / (d_b) * (theta_counts[d,] + alpha) / (d_a)
-        
-        z <- sample(seq_len(Nk), 1, prob = p_z)
-        
-        # update counts
-        theta_counts[d,z] <- theta_counts[d,z] + 1 # count that topic in the document
-        
-        n_d[d] <- n_d[d] + 1 # count that topic in that document overall
-        
-        z_dn[[d]][n] <- z
-        
-        phi_counts[z,docs[[d]][n]] <- phi_counts[z,docs[[d]][n]] + 1 # count that word and topic
-        
-        n_z[z] <- n_z[z] + 1 # count the word in that topic overall
-        
-        
-      }
-    }
-    if (burnin > -1 & i >= burnin) { # if we use burnin, we average over the chain
-      theta_sums <- theta_sums + theta_counts
-      
-      phi_sums <- phi_sums + phi_counts
-    }
-  }
   
   ### Format posteriors correctly ----
-  # calculate output parameters
-  if (burnin > -1) {
-    theta <- theta_sums / (iterations - burnin)
-    
-    phi <- phi_sums / (iterations - burnin)
-  } else {
-    theta <- theta_counts
-    
-    phi <- phi_counts
-  }
   
+  phi <- result$phi
+  
+  theta <- result$theta
   
   phi <- t(t(phi) + beta)
   
@@ -243,8 +146,7 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   
   rownames(theta) <- rownames(dtm)
   
-  ### return the result ----
-  
+  ### collect the result ----
   gamma <- textmineR::CalcPhiPrime(phi = phi, theta = theta, 
                                    p_docs = Matrix::rowSums(dtm))
   
@@ -253,5 +155,15 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   
   class(result) <- c("LDA", "TopicModel")
   
+  ### calculate additional things ----
+  if (calc_coherence) {
+    result$coherence <- textmineR::CalcProbCoherence(result$phi, dtm, M = 5)
+  }
+  
+  if (calc_r2) {
+    result$r2 <- textmineR::CalcTopicModelR2(dtm, result$phi, result$theta, ...)
+  }
+  
+  ### return result ----
   result
 }

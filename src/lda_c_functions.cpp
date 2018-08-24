@@ -1,19 +1,74 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include <RcppArmadilloExtensions/sample.h>
+#include <R.h>
 #include <Rcpp.h>
+#define ARMA_64BIT_WORD
 using namespace Rcpp;
+
+// This turns a dgCMatrix DTM into a list of indices for looping over in
+// an LDA gibbs sampler
+// [[Rcpp::export]]
+List dtm_to_lexicon_c(arma::sp_mat x) {
+  
+  // initialize some variables
+  
+  int d,v; // iteration indices
+  
+  int Nd = x.n_rows; // number of docs
+  
+  int Nw = x.n_cols; // number of words
+  
+  IntegerVector doc_sums(Nd); // gives length of each output vector
+  
+  List out(Nd); // list to hold output vectors
+  
+  // loop over each document
+  for (d = 0; d < Nd; d++) {
+    
+    // count tokens in each document for length of output vector
+    for (v = 0; v < Nw; v++) {
+      doc_sums[d] = doc_sums[d] + x(d,v);
+    }
+    
+    IntegerVector tmp(doc_sums[d]); // temporary vector to be inserted into output
+    
+    int k = 0; // index of tmp, advances when we have non-zero entries 
+    
+    for (v = 0; v < Nw; v++) {
+      
+      if (x(d,v) > 0) { // if non-zero, add elements to tmp
+        
+        int idx = k + x(d,v); // where to stop the loop below
+        
+        while (k < idx) {
+          
+          tmp[k] = v;
+          
+          k = k + 1;
+        }
+        
+      }
+      
+    }
+    
+    out[d] = tmp;
+  }
+  
+  return out;
+  
+}
+
 
 
 // This is a collapsed gibbs sampler for LDA.
 // Pre-processing and post-processing is assumed in R
-
 // [[Rcpp::export]]
 List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha, 
                NumericVector beta, int iterations, int burnin) {
   
   // print a status so we can see where we are
-  //std::cout << "declaring variables\n";
+  // std::cout << "declaring variables\n";
   
   // Declare some initial variables
   double sum_alpha = sum(alpha); // rcpp sugar here, I guess
@@ -48,7 +103,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations
   
   // Assign initial values at random
-  //std::cout << "assigning initial values \n";
+  // std::cout << "assigning initial values \n";
   
   for(d = 0; d < docs.length(); d++){
     IntegerVector doc = docs[d];
@@ -58,7 +113,9 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
     for(n = 0; n < doc.length(); n++){
       
       // sample a topic at random
-      z = rand() % Nk;
+      z1 = RcppArmadillo::sample(topic_sample, 1, false, NumericVector::create());
+      
+      z = z1[0];
       
       theta_counts(d,z) = theta_counts(d,z) + 1;
       
@@ -79,11 +136,13 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   }
   
   // Gibbs iterations
-  //std::cout << "beginning Gibbs \n";
+  // std::cout << "beginning Gibbs \n";
   for (i = 0; i < iterations; i++) { // for each iteration
     
     for (d = 0; d < Nd; d++) { // for each document
-      //std::cout << "document " << d << "\n";
+      // std::cout << "document " << d << "\n";
+      
+      R_CheckUserInterrupt();
       
       IntegerVector doc = docs[d]; // placeholder for a document
       
@@ -107,6 +166,8 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
           
           p_z[k] = (phi_counts(k,doc[n]) + beta[doc[n]]) / (n_z[k] + k_beta[doc[n]]) *
             (theta_counts(d,k) + alpha[k]) / (n_d[d] + sum_alpha);
+          
+          // p_z[k] = (phi_counts(k,doc[n]) + beta[doc[n]]) * (theta_counts(d,k) + alpha[k]);
           
         }
         
@@ -148,7 +209,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   }
   
   // return the result
-  //std::cout << "prepare result\n";
+  // std::cout << "prepare result\n";
   
   if (burnin > -1) {
     int i_diff = iterations - burnin;
@@ -181,38 +242,26 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
 }
 
 /*** R
-X <- rbind(c(0, 0, 1, 2, 2),
-           c(0, 0, 1, 1, 1),
-           c(0, 1, 2, 2, 2),
-           c(4, 4, 4, 0, 0),
-           c(3, 3, 4, 0, 0),
-           c(3, 4, 4, 1, 0))
+
+source("~/Documents/gmu/study_summer_2018/R/FitLdaModel.R")
+
+dtm <- textmineR::nih_sample_dtm
+
+k <- 15
+
+alpha <- rgamma(k, 5, 20)
+
+beta <- Matrix::colSums(dtm) / sum(Matrix::colSums(dtm)) * 256
+
+m <- FitLdaModel(dtm = dtm, 
+                 k = k, 
+                 iterations = 1000,
+                 burnin = 900,
+                 alpha = alpha, 
+                 beta = beta,
+                 calc_coherence = TRUE,
+                 calc_r2 = TRUE,
+                 seed = 1234)
   
-  
-  docs <- apply(X, 1, function(x){
-    out <- c()
-    for (j in seq_along(x)) {
-      out <- c(out, rep(j, x[j]))
-    }
-    out
-  })
-  
-  Nd <- nrow(X)
-  
-  Nk <- 2
-
-Nv <- ncol(X)
-  
-  alpha <- numeric(Nk) + .1
-
-beta <- numeric(Nv) + .1
-
-iterations <- 1000
-
-burnin = -1
-
-m <- fit_lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, alpha = alpha, beta = beta,
-           iterations = iterations, burnin = burnin)
-
 */
 
