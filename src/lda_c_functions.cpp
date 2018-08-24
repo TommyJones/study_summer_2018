@@ -28,7 +28,7 @@ List dtm_to_lexicon_c(arma::sp_mat x) {
     
     // count tokens in each document for length of output vector
     for (v = 0; v < Nw; v++) {
-      doc_sums[d] = doc_sums[d] + x(d,v);
+      doc_sums[d] += x(d,v);
     }
     
     IntegerVector tmp(doc_sums[d]); // temporary vector to be inserted into output
@@ -45,7 +45,7 @@ List dtm_to_lexicon_c(arma::sp_mat x) {
           
           tmp[k] = v;
           
-          k = k + 1;
+          k += 1;
         }
         
       }
@@ -105,7 +105,7 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
   // Assign initial values at random
   // std::cout << "assigning initial values \n";
   
-  for(d = 0; d < docs.length(); d++){
+  for(d = 0; d < Nd; d++){
     IntegerVector doc = docs[d];
     
     IntegerVector z_dn_row(doc.length());
@@ -117,15 +117,15 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
       
       z = z1[0];
       
-      theta_counts(d,z) = theta_counts(d,z) + 1;
+      theta_counts(d,z) += 1;
       
       v = doc[n];
       
-      phi_counts(z,v) = phi_counts(z,v) + 1;
+      phi_counts(z,v) += 1;
       
-      n_d[d] = n_d[d] + 1; // count that topic in that document overall
+      n_d[d] = n_d[d] + 1; // count the number of tokens in the document
       
-      n_z[z] = n_z[z] + 1; // count the that topic overall
+      n_z[z] += 1; // count the that topic overall
       
       z_dn_row[n] = z; // # count that topic for that word in the document
       
@@ -148,18 +148,18 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
       
       IntegerVector z_dn_row = z_dn[d]; // placeholder for doc-word-topic assigment
       
-      for (n = 0; n < doc.length(); n++) { // for each word in that document
+      for (n = 0; n < n_d[d]; n++) { // for each word in that document
         
         // discount for the n-th word with topic z
         z = z_dn_row[n];
         
-        theta_counts(d,z) = theta_counts(d,z) - 1; 
+        theta_counts(d,z) -= 1; 
         
-        phi_counts(z,doc[n]) = phi_counts(z,doc[n]) - 1;
+        phi_counts(z,doc[n]) -= 1;
         
-        n_z[z] = n_z[z] - 1;
+        n_z[z] -= 1;
         
-        n_d[d] = n_d[d] - 1;
+        // n_d[d] -= 1;
         
         // sample topic index
         for (k = 0; k < Nk; k++) {
@@ -177,13 +177,13 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
         
         z = z1[0];
         
-        theta_counts(d,z) = theta_counts(d,z) + 1; // update document topic count
+        theta_counts(d,z) += 1; // update document topic count
         
-        phi_counts(z,doc[n]) = phi_counts(z,doc[n]) + 1; // update topic word count
+        phi_counts(z,doc[n]) += 1; // update topic word count
         
-        n_d[d] = n_d[d] + 1; // count that topic in that document overall
+        // n_d[d] = n_d[d] + 1; // count that topic in that document overall
         
-        n_z[z] = n_z[z] + 1; // count the that topic overall
+        n_z[z] += 1; // count the that topic overall
         
         z_dn_row[n] = z; // # count that topic for that word in the document
         
@@ -196,11 +196,11 @@ List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha,
       for (k = 0; k < Nk; k++) {
         
         for (d = 0; d < Nd; d++) {
-          theta_sums(d,k) = theta_sums(d,k) + theta_counts(d,k);
+          theta_sums(d,k) += theta_counts(d,k);
         }
         
         for (v = 0; v < Nv; v++) {
-          phi_sums(k,v) = phi_sums(k,v) + phi_counts(k,v);
+          phi_sums(k,v) += phi_counts(k,v);
         }
       }
       
