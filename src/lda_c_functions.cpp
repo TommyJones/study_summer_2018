@@ -64,8 +64,8 @@ List dtm_to_lexicon_c(arma::sp_mat x) {
 // This is a collapsed gibbs sampler for LDA.
 // Pre-processing and post-processing is assumed in R
 // [[Rcpp::export]]
-List fit_lda_c(List docs, int Nk, int Nd, int Nv, NumericVector alpha, 
-               NumericVector beta, int iterations, int burnin) {
+List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha, 
+               NumericVector &beta, int &iterations, int &burnin) {
   
   // print a status so we can see where we are
   // std::cout << "declaring variables\n";
