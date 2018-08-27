@@ -241,6 +241,145 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
   
 }
 
+// [[Rcpp::export]]
+List predict_lda_c(List &docs, int &Nk, int &Nd, NumericVector &alpha, 
+                   NumericMatrix &phi, int &iterations, int &burnin) {
+  
+  /* Declare some initial variables */
+  double sum_alpha = sum(alpha); // rcpp sugar here, I guess
+  
+  /* Declare data structures */
+  int i, d, n, k; // indices for loops
+  
+  NumericVector p_z(Nk);
+  
+  IntegerVector z1; // placeholder for topic sampled
+  
+  int z = 0; // placeholder for topic sampled
+
+  IntegerVector topic_sample = seq_len(Nk) -1; // index of topics from which to sample
+  
+  List z_dn(Nd) ; // count of topic/term assignments by document
+  
+  IntegerMatrix theta_counts(Nd, Nk); // count of topics over documents
+  
+  IntegerVector n_d(Nd); // total count of term document totals
+  
+  IntegerMatrix theta_sums(Nd, Nk); // initialize matrix for averaging over iterations
+  
+  
+  /* Assign initial values at random */
+  // std::cout << "assigning initial values \n";
+  
+  for(d = 0; d < Nd; d++){
+    IntegerVector doc = docs[d];
+    
+    IntegerVector z_dn_row(doc.length());
+    
+    for(n = 0; n < doc.length(); n++){
+      
+      // sample a topic at random
+      z1 = RcppArmadillo::sample(topic_sample, 1, false, NumericVector::create());
+      
+      z = z1[0]; // type conversion
+      
+      theta_counts(d,z) += 1; // update counts of topics in documents
+      
+      n_d[d] = n_d[d] + 1; // count the number of tokens in the document
+      
+      z_dn_row[n] = z; // # count that topic for that word in the document
+      
+    }
+    
+    z_dn[d] = z_dn_row; // update topic-doc-word tracking
+    
+  }
+  
+  
+  /* Gibbs iterations */
+  // std::cout << "beginning Gibbs \n";
+  for (i = 0; i < iterations; i++) { // for each iteration
+    
+    for (d = 0; d < Nd; d++) { // for each document
+      // std::cout << "document " << d << "\n";
+      
+      R_CheckUserInterrupt();
+      
+      IntegerVector doc = docs[d]; // placeholder for a document
+      
+      IntegerVector z_dn_row = z_dn[d]; // placeholder for doc-word-topic assigment
+      
+      for (n = 0; n < n_d[d]; n++) { // for each word in that document
+        
+        // discount for the n-th word with topic z
+        z = z_dn_row[n];
+        
+        theta_counts(d,z) -= 1; 
+        
+        // sample topic index
+        
+        for (k = 0; k < Nk; k++) {
+          
+          p_z[k] = (phi(k,doc[n])) * (theta_counts(d,k) + alpha[k]) / (n_d[d] + sum_alpha);
+          
+        }
+        
+        
+        // update counts
+        z1 = RcppArmadillo::sample(topic_sample, 1, false, p_z);
+        
+        z = z1[0];
+        
+        theta_counts(d,z) += 1; // update document topic count
+        
+        z_dn_row[n] = z; // # count that topic for that word in the document
+        
+      }
+    }
+    
+    // if using burnin, update sums
+    if (burnin > -1 && i >= burnin) {
+      
+      for (k = 0; k < Nk; k++) {
+        
+        for (d = 0; d < Nd; d++) {
+          theta_sums(d,k) += theta_counts(d,k);
+        }
+        
+      }
+      
+    }
+    
+  }
+  
+  
+  /* Return the result */
+  // std::cout << "prepare result\n";
+  
+  if (burnin > -1) {
+    int i_diff = iterations - burnin;
+    
+    NumericMatrix theta(Nd,Nk);
+    
+    // average over chain after burnin 
+    for (k = 0; k < Nk; k++) {
+      
+      for (d = 0; d < Nd; d++) {
+        theta(d,k) = (theta_sums(d,k) / i_diff);
+      }
+      
+    }
+    
+    return List::create(Named("theta") = theta);
+    
+  } else {
+    return List::create(Named("theta") = theta_counts);
+  }
+  
+}
+
+
+
 /*** R
 
 source("~/Documents/gmu/study_summer_2018/R/FitLdaModel.R")
@@ -263,6 +402,7 @@ m <- FitLdaModel(dtm = dtm,
                  calc_r2 = TRUE,
                  seed = 1234)
   
+preds <- predict(m, newdata = dtm, iterations = 1000, burnin = 900)
 
 microbenchmark::microbenchmark(FitLdaModel(dtm = dtm, 
                                            k = k, 

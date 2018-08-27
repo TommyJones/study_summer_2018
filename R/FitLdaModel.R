@@ -169,3 +169,98 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   ### return result ----
   result
 }
+
+### Predict method for LDA objects
+predict.LDA <- function(object, newdata, method = c("gibbs", "dot"), 
+                        iterations = NULL, burnin = -1, seed = NULL, ...) {
+  
+  ### Check inputs ----
+  if (method[1] == "gibbs") {
+    
+    if (is.null(iterations)) {
+      stop("when using method 'gibs' iterations must be specified.")
+    }
+    
+    if (burnin >= iterations) {
+      stop("burnin must be less than iterations")
+    }
+    
+  }
+  
+  
+  if (sum(c("LDA", "TopicModel") %in% class(object)) < 2) {
+    stop("object must be a topic model object of class c('LDA', 'TopicModel')")
+  }
+  
+  if (sum(c("dgCMatrix", "character") %in% class(newdata)) < 1) {
+    stop("newdata must be a matrix of class dgCMatrix or a character vector")
+  }
+  
+  if (sum(c("gibbs", "dot") %in% method) == 0) {
+    stop("method must be one of 'gibbs' or 'dot'")
+  }
+  
+  if (! is.null(seed)) {
+    if (! is.numeric(seed)){
+      stop("seed must be NULL or numeric")
+    }
+    set.seed(seed)
+  }
+  
+  ### If newdata is a character vector, convert to dgCMatrix ----
+  # TODO: requires re-write of outputs of CreateDtm/CreateTcm
+  
+  if ("dgCMatrix" %in% class(newdata)) {
+    dtm_newdata <- newdata
+  } else {
+    # code to convert goes here
+    stop("newdata not of class character is not yet supported")
+  }
+  
+  ### Align vocabulary ----
+  vocab1 <- colnames(object$dtm)
+  # vocab2 <- setdiff(colnames(dtm_newdata), colnames(object$dtm)) # for now unused
+  
+  ### Get predictions ----
+  
+  if (method[1] == "dot") { # dot product method
+    
+    result <- dtm_newdata[ ,vocab1]
+    result <- (result / Matrix::rowSums(result)) %*% t(object$gamma[ ,vocab1])
+    result <- as.matrix(result)
+    
+  } else { # gibbs method
+    # format inputs
+    docs <- Dtm2Lexicon(dtm_newdata[,vocab1])
+    
+    Nd <- nrow(dtm_newdata)
+    
+    Nk <- nrow(object$phi)
+    
+    sum_alpha <- sum(object$alpha)
+    
+    # pass inputs to C function
+    theta <- predict_lda_c(docs = docs, Nk = Nk, Nd = Nd, 
+                           alpha = object$alpha, phi = object$phi,
+                           iterations = iterations, burnin = burnin)
+    
+    theta <- theta$theta
+    
+    # format outputs
+    theta <- t(t(theta) + object$alpha)
+    
+    theta <- theta / rowSums(theta, na.rm = TRUE)
+    
+    theta[ is.na(theta) ] <- 0
+    
+    result <- theta
+  }
+  
+  # return result
+  
+  rownames(result) <- rownames(dtm_newdata)
+  colnames(result) <- rownames(object$phi)
+  
+  result
+  
+}
