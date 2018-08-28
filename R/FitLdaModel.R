@@ -5,7 +5,23 @@
 ################################################################################
 
 
-
+#' Turn a document term matrix into a list for LDA Gibbs sampling
+#' @description Represents a document term matrix as a list. 
+#' @param dtm A document term matrix (or term co-occurrence matrix) of class 
+#' \code{dgCMatrix}. 
+#' @param ... Other arguments to be passed to \code{\link[textmineR]{TmParallelApply}}.
+#' @return Returns a list. Each element of the list represents a row of the input
+#' matrix. Each list element contains a numeric vector with as many entries as
+#' tokens in the original document. The entries are the column index for that token, minus 1. 
+#' @examples
+#' \dontrun{
+#' # Load pre-formatted data for use
+#' data(nih_sample_dtm)
+#' 
+#' result <- Dtm2Lexicon(dtm = nih_sample_dtm, 
+#'                       cpus = 2)
+#' }
+#' @export 
 Dtm2Lexicon <- function(dtm, ...) {
 
   # do in parallel in batches of about 3000 if we have more than 3000 docs
@@ -31,7 +47,9 @@ Dtm2Lexicon <- function(dtm, ...) {
   
 }
 
-#' @param dtm A document term matrix of class dgCMatrix
+#' Fit a Latent Dirichlet Allocation topic model
+#' @description Fit a Latent Dirichlet Allocation topic model using collapsed Gibbs sampling. 
+#' @param dtm A document term matrix or term co-occurrence matrix of class dgCMatrix
 #' @param k Integer number of topics
 #' @param alpha Vector of length \code{k} for asymmetric or a number for symmetric.
 #'        This is the prior for topics over documents
@@ -39,8 +57,13 @@ Dtm2Lexicon <- function(dtm, ...) {
 #'        This is the prior for words over topics.
 #' @param iterations Integer number of iterations for the Gibbs sampler to run. A
 #'        future version may include automatic stopping criteria.
-#' @param seed If not null (the default) then the random seed you wish to set
+#' @param seed If not null (the default) then the random seed you wish to set. This
+#' will return the same outputs for the same inputs. Useful for diagnostics.
 #' @param ... Other arguments to be passed to textmineR::TmParallelApply
+#' @return Returns an S3 object of class c("LDA", "TopicModel"). DESCRIBE MORE
+#' @details EXPLAIN IMPLEMENTATION DETAILS
+#' @examples GIVE EXAMPLES
+#' @export
 FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, beta = 0.05, 
                         calc_coherence = TRUE, calc_r2 = FALSE, seed = NULL, ...){
   
