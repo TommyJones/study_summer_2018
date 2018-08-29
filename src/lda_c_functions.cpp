@@ -414,5 +414,7 @@ microbenchmark::microbenchmark(FitLdaModel(dtm = dtm,
                                            calc_r2 = FALSE,
                                            seed = 1234), times = 10)
 
+save.image(".RData")
+
 */
 
