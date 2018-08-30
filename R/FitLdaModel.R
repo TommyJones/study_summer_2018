@@ -181,6 +181,8 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
                  dtm = dtm, alpha = alpha, beta = beta,
                  log_likelihood = data.frame(result$log_likelihood)) # add other things here
   
+  names(result$log_likelihood) <- c("iteration", "log_likelihood")
+  
   class(result) <- c("LDA", "TopicModel")
   
   ### calculate additional things ----
