@@ -65,7 +65,8 @@ Dtm2Lexicon <- function(dtm, ...) {
 #' @examples GIVE EXAMPLES
 #' @export
 FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, beta = 0.05, 
-                        calc_coherence = TRUE, calc_r2 = FALSE, seed = NULL, ...){
+                        calc_likelihood = FALSE, calc_coherence = TRUE, calc_r2 = FALSE, 
+                        seed = NULL, ...){
   
   ### Check inputs are of correct dimensionality ----
   
@@ -142,7 +143,8 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   
   result <- fit_lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, 
                       alpha = alpha, beta = beta,
-                      iterations = iterations, burnin = burnin)
+                      iterations = iterations, burnin = burnin,
+                      calc_likelihood = calc_likelihood)
   
   
   ### Format posteriors correctly ----
@@ -176,7 +178,8 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
                                    p_docs = Matrix::rowSums(dtm))
   
   result <- list(phi = phi, theta = theta, gamma = gamma,
-                 dtm = dtm, alpha = alpha, beta = beta) # add other things here
+                 dtm = dtm, alpha = alpha, beta = beta,
+                 log_likelihood = data.frame(result$log_likelihood)) # add other things here
   
   class(result) <- c("LDA", "TopicModel")
   
@@ -187,6 +190,10 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   
   if (calc_r2) {
     result$r2 <- textmineR::CalcTopicModelR2(dtm, result$phi, result$theta, ...)
+  }
+  
+  if (! calc_likelihood) {
+    result$log_likelihood <- NULL
   }
   
   ### return result ----

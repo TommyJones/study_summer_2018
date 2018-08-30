@@ -2,6 +2,7 @@
 
 #include <RcppArmadilloExtensions/sample.h>
 #include <R.h>
+#include <cmath>
 #include <Rcpp.h>
 #define ARMA_64BIT_WORD
 using namespace Rcpp;
@@ -65,7 +66,8 @@ List dtm_to_lexicon_c(arma::sp_mat x) {
 // Pre-processing and post-processing is assumed in R
 // [[Rcpp::export]]
 List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha, 
-               NumericVector &beta, int &iterations, int &burnin) {
+               NumericVector &beta, int &iterations, int &burnin,
+               bool &calc_likelihood) {
   
   // print a status so we can see where we are
   // std::cout << "declaring variables\n";
@@ -98,9 +100,28 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
 
   IntegerVector n_z(Nk); // total count of topic totals
 
-  IntegerMatrix theta_sums(Nd, Nk); // initialize matrix for averaging over iterations
+  IntegerMatrix theta_sums(Nd, Nk); // initialize matrix for averaging over iterations if burnin > -1
 
-  IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations
+  IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations if burnin > -1
+  
+  NumericMatrix ll(iterations / 10, 2); // if calc_likelihood, store it here
+  
+  double lgbeta = 0.0; // if calc_likelihood, we need this term
+  
+  double lgalpha = 0.0; // if calc_likelihood, we need this term
+  
+  if (calc_likelihood) { // if calc_likelihood, actually populate this stuff
+    
+    for (n = 0; n < Nv; n++) {
+      lgbeta += lgamma(beta[n]);
+    }
+    
+    
+    for (k = 0; k < Nk; k++) {
+      lgalpha += lgamma(alpha[k]);
+    }
+  }
+  
   
   // Assign initial values at random
   // std::cout << "assigning initial values \n";
@@ -206,6 +227,33 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
       
     }
     
+    // if calculating log likelihood, do so every 10 iterations
+    if (calc_likelihood && i % 10 == 0) {
+      
+      ll(i / 10, 0) = i;
+      
+      ll(i / 10, 1) = lgalpha + lgbeta;
+      
+      double ld = 0.0; // if calc_likelihood, we need this term
+      
+      double lk = 0.0; // if calc_likelihood, we need this term
+      
+      for (k = 0; k < Nk; k++) {
+        
+        for (d = 0; d < Nd; d++) {
+          ld += lgamma(theta_counts(d,k) + alpha[k]);
+        }
+        
+        for (n = 0; n < Nv; n++) {
+          lk += lgamma(phi_counts(k,n) + beta[n]);
+        }
+        
+      }
+      
+      ll(i / 10, 1) += ld + lk;
+      
+    }
+    
   }
   
   // return the result
@@ -231,11 +279,13 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
     }
     
     return List::create(Named("theta") = theta,
-                        Named("phi") = phi);
+                        Named("phi") = phi,
+                        Named("log_likelihood") = ll);
     
   } else {
     return List::create(Named("theta") = theta_counts,
-                        Named("phi") = phi_counts);
+                        Named("phi") = phi_counts,
+                        Named("log_likelihood") = ll);
   }
   
   
@@ -398,6 +448,7 @@ m <- FitLdaModel(dtm = dtm,
                  burnin = 900,
                  alpha = alpha, 
                  beta = beta,
+                 calc_likelihood = TRUE,
                  calc_coherence = TRUE,
                  calc_r2 = TRUE,
                  seed = 1234)
@@ -410,6 +461,7 @@ microbenchmark::microbenchmark(FitLdaModel(dtm = dtm,
                                            burnin = -1,
                                            alpha = alpha, 
                                            beta = beta,
+                                           calc_likelihood = FALSE,
                                            calc_coherence = FALSE,
                                            calc_r2 = FALSE,
                                            seed = 1234), times = 10)
