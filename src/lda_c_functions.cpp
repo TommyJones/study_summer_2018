@@ -65,14 +65,19 @@ List dtm_to_lexicon_c(arma::sp_mat x) {
 // This is a collapsed gibbs sampler for LDA.
 // Pre-processing and post-processing is assumed in R
 // [[Rcpp::export]]
-List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha, 
+List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector alph, 
                NumericVector &beta, int &iterations, int &burnin,
-               bool &calc_likelihood) {
+               bool &optimize_alpha, bool &calc_likelihood) {
   
   // print a status so we can see where we are
   // std::cout << "declaring variables\n";
   
   // Declare some initial variables
+  
+  NumericVector alpha = alph; // don't overwrite inputs
+  
+  int sumtokens(0); // number of unique tokens
+  
   double sum_alpha = sum(alpha); // rcpp sugar here, I guess
 
   NumericVector k_beta = beta * Nk; // rcpp sugar here, I guess
@@ -106,20 +111,23 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
   
   NumericMatrix ll(iterations / 10, 2); // if calc_likelihood, store it here
   
-  double lgbeta = 0.0; // if calc_likelihood, we need this term
-  
-  double lgalpha = 0.0; // if calc_likelihood, we need this term
-  
+  double lgbeta(0.0); // if calc_likelihood, we need this term
+
+  double lgalpha(0.0); // if calc_likelihood, we need this term
+
   if (calc_likelihood) { // if calc_likelihood, actually populate this stuff
-    
+
     for (n = 0; n < Nv; n++) {
       lgbeta += lgamma(beta[n]);
     }
-    
-    
+
+    lgbeta = (lgbeta - lgamma(sum(beta))) * Nk; // rcpp sugar here
+
     for (k = 0; k < Nk; k++) {
       lgalpha += lgamma(alpha[k]);
     }
+
+    lgalpha = (lgalpha - lgamma(sum_alpha)) * Nd;
   }
   
   
@@ -155,6 +163,8 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
     z_dn[d] = z_dn_row; // update topic-doc-word tracking
     
   }
+  
+  sumtokens = sum(n_d); // rcpp sugar, also get sum of tokens
   
   // Gibbs iterations
   // std::cout << "beginning Gibbs \n";
@@ -230,31 +240,56 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
     // if calculating log likelihood, do so every 10 iterations
     if (calc_likelihood && i % 10 == 0) {
       
-      ll(i / 10, 0) = i;
+      double ld(0.0); // if calc_likelihood, we need this term
       
-      ll(i / 10, 1) = lgalpha + lgbeta;
+      double lk(0.0); // if calc_likelihood, we need this term
       
-      double ld = 0.0; // if calc_likelihood, we need this term
+      int theta_counts_sum(0);
       
-      double lk = 0.0; // if calc_likelihood, we need this term
+      int phi_counts_sum(0);
       
       for (k = 0; k < Nk; k++) {
-        
+
         for (d = 0; d < Nd; d++) {
           ld += lgamma(theta_counts(d,k) + alpha[k]);
+
+          theta_counts_sum += theta_counts(d,k);
         }
-        
+
         for (n = 0; n < Nv; n++) {
           lk += lgamma(phi_counts(k,n) + beta[n]);
+
+          phi_counts_sum += phi_counts(k,n);
         }
-        
+
+      }
+
+      ld -= lgamma(theta_counts_sum);
+
+      lk -= lgamma(phi_counts_sum);
+
+      ll(i / 10, 0) = i;
+
+      ll(i / 10, 1) = ld - lgalpha + lk - lgbeta;
+
+    }
+    
+    // if optimizing alpha, do so
+    if (optimize_alpha) {
+      NumericVector new_alpha(Nk);
+      
+      for (k = 0; k < Nk; k++) {
+        for (d = 0; d < Nd; d++) {
+          new_alpha[k] += (double)theta_counts(d,k) / (double)sumtokens * (double)sum_alpha;
+        }
       }
       
-      ll(i / 10, 1) += ld + lk;
+      alpha = new_alpha;
       
     }
     
   }
+    
   
   // return the result
   // std::cout << "prepare result\n";
@@ -280,12 +315,16 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector &alpha,
     
     return List::create(Named("theta") = theta,
                         Named("phi") = phi,
-                        Named("log_likelihood") = ll);
+                        Named("log_likelihood") = ll,
+                        Named("alpha") = alpha,
+                        Named("beta") = beta);
     
   } else {
     return List::create(Named("theta") = theta_counts,
                         Named("phi") = phi_counts,
-                        Named("log_likelihood") = ll);
+                        Named("log_likelihood") = ll,
+                        Named("alpha") = alpha,
+                        Named("beta") = beta);
   }
   
   
@@ -444,15 +483,18 @@ beta <- Matrix::colSums(dtm) / sum(Matrix::colSums(dtm)) * 256
 
 m <- FitLdaModel(dtm = dtm, 
                  k = k, 
-                 iterations = 1000,
-                 burnin = 900,
+                 iterations = 200,
+                 burnin = 20,
                  alpha = alpha, 
                  beta = beta,
+                 optimize_alpha = TRUE,
                  calc_likelihood = TRUE,
                  calc_coherence = TRUE,
                  calc_r2 = TRUE,
                  seed = 1234)
   
+plot(m$log_likelihood, type = "l")
+
 preds <- predict(m, newdata = dtm, iterations = 1000, burnin = 900)
 
 microbenchmark::microbenchmark(FitLdaModel(dtm = dtm, 
@@ -461,6 +503,7 @@ microbenchmark::microbenchmark(FitLdaModel(dtm = dtm,
                                            burnin = -1,
                                            alpha = alpha, 
                                            beta = beta,
+                                           optimize_alpha = FALSE,
                                            calc_likelihood = FALSE,
                                            calc_coherence = FALSE,
                                            calc_r2 = FALSE,
