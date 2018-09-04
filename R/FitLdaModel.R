@@ -65,8 +65,8 @@ Dtm2Lexicon <- function(dtm, ...) {
 #' @examples GIVE EXAMPLES
 #' @export
 FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, beta = 0.05, 
-                        calc_likelihood = FALSE, calc_coherence = TRUE, calc_r2 = FALSE, 
-                        seed = NULL, ...){
+                        optimize_alpha = FALSE, calc_likelihood = FALSE, 
+                        calc_coherence = TRUE, calc_r2 = FALSE, seed = NULL, ...){
   
   ### Check inputs are of correct dimensionality ----
   
@@ -142,8 +142,9 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
   ### run C++ gibbs sampler ----
   
   result <- fit_lda_c(docs = docs, Nk = Nk, Nd = Nd, Nv = Nv, 
-                      alpha = alpha, beta = beta,
+                      alph = alpha, beta = beta,
                       iterations = iterations, burnin = burnin,
+                      optimize_alpha = optimize_alpha,
                       calc_likelihood = calc_likelihood)
   
   
@@ -178,7 +179,7 @@ FitLdaModel <- function(dtm, k, iterations = NULL, burnin = -1, alpha = 0.1, bet
                                    p_docs = Matrix::rowSums(dtm))
   
   result <- list(phi = phi, theta = theta, gamma = gamma,
-                 dtm = dtm, alpha = alpha, beta = beta,
+                 dtm = dtm, alpha = result$alpha, beta = result$beta,
                  log_likelihood = data.frame(result$log_likelihood)) # add other things here
   
   names(result$log_likelihood) <- c("iteration", "log_likelihood")
