@@ -109,7 +109,7 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector alph,
 
   IntegerMatrix phi_sums(Nk, Nv); // initialize matrix for averaging over iterations if burnin > -1
   
-  NumericMatrix ll(iterations / 10, 2); // if calc_likelihood, store it here
+  NumericMatrix ll(iterations / 10, 3); // if calc_likelihood, store it here
   
   double lgbeta(0.0); // if calc_likelihood, we need this term
 
@@ -240,37 +240,110 @@ List fit_lda_c(List &docs, int &Nk, int &Nd, int &Nv, NumericVector alph,
     // if calculating log likelihood, do so every 10 iterations
     if (calc_likelihood && i % 10 == 0) {
       
-      double ld(0.0); // if calc_likelihood, we need this term
+      // get phi probability matrix @ this iteration
+      NumericMatrix phi_prob(Nk,Nv);
       
-      double lk(0.0); // if calc_likelihood, we need this term
+      double denom(0.0);
       
-      int theta_counts_sum(0);
-      
-      int phi_counts_sum(0);
+      double lp_beta(0.0); // log probability of beta prior
       
       for (k = 0; k < Nk; k++) {
-
-        for (d = 0; d < Nd; d++) {
-          ld += lgamma(theta_counts(d,k) + alpha[k]);
-
-          theta_counts_sum += theta_counts(d,k);
+        
+        // get the denominator
+        for (v = 0; v < Nv; v++) {
+          denom += phi_counts(k,v) + beta[v];
         }
-
-        for (n = 0; n < Nv; n++) {
-          lk += lgamma(phi_counts(k,n) + beta[n]);
-
-          phi_counts_sum += phi_counts(k,n);
+        
+        // get the probability
+        for (v = 0; v < Nv; v++) {
+          phi_prob(k,v) = ((double)phi_counts(k,v) + beta[v]) / denom;
+          
+          lp_beta += (beta[v] - 1) * log(phi_prob(k,v));
         }
-
+      }
+      
+      lp_beta += lgbeta;
+      
+      // for each document, get the log probability of the words
+      
+      double lp_alpha(0.0); // log probability of alpha prior
+      
+      double lpd(0.0); // log probability of documents
+      
+      for (d = 0; d < Nd; d++) {
+        
+        NumericVector theta_prob(Nk); // probability of each topic in this document
+        
+        IntegerVector doc = docs[d];
+        
+        NumericVector lp(doc.length()); // log probability of each word under the model
+        
+        double denom(0.0);
+        
+        for (k = 0; k < Nk; k++) {
+          denom += (double)theta_counts(d,k) + alpha[k];
+        }
+        
+        for (k = 0; k < Nk; k++) {
+          theta_prob[k] = ((double)theta_counts(d,k) + alpha[k]) / denom;
+          
+          lp_alpha += (alpha[k] - 1) * log(theta_prob[k]);
+        }
+        
+        for (n = 0; n < doc.length(); n++) {
+          
+          lp[n] = 0.0;
+          
+          for (k = 0; k < Nk; k++) {
+            
+            lp[n] += theta_prob[k] * phi_prob(k,doc[n]);
+            
+          }
+          
+          lpd += log(lp[n]);
+        }
+        
       }
 
-      ld -= lgamma(theta_counts_sum);
-
-      lk -= lgamma(phi_counts_sum);
-
+      lp_alpha += lgalpha;
+      
       ll(i / 10, 0) = i;
+      
+      ll(i / 10, 1) = lpd; // log probability of whole corpus under the model w/o priors
+      
+      ll(i / 10, 2) = lpd + lp_alpha + lp_beta;
 
-      ll(i / 10, 1) = ld - lgalpha + lk - lgbeta;
+      // double ld(0.0); // if calc_likelihood, we need this term
+      // 
+      // double lk(0.0); // if calc_likelihood, we need this term
+      // 
+      // int theta_counts_sum(0);
+      // 
+      // int phi_counts_sum(0);
+      // 
+      // for (k = 0; k < Nk; k++) {
+      // 
+      //   for (d = 0; d < Nd; d++) {
+      //     ld += lgamma(theta_counts(d,k) + alpha[k]);
+      // 
+      //     theta_counts_sum += theta_counts(d,k);
+      //   }
+      // 
+      //   for (n = 0; n < Nv; n++) {
+      //     lk += lgamma(phi_counts(k,n) + beta[n]);
+      // 
+      //     phi_counts_sum += phi_counts(k,n);
+      //   }
+      // 
+      // }
+      // 
+      // ld -= lgamma(theta_counts_sum);
+      // 
+      // lk -= lgamma(phi_counts_sum);
+      // 
+      // ll(i / 10, 0) = i;
+      // 
+      // ll(i / 10, 1) = ld - lgalpha + lk - lgbeta;
 
     }
     
@@ -493,7 +566,10 @@ m <- FitLdaModel(dtm = dtm,
                  calc_r2 = TRUE,
                  seed = 1234)
   
-plot(m$log_likelihood, type = "l")
+plot(m$log_likelihood[,c(1,2)], type = "l", main = "likelihood w/o prior")
+
+plot(m$log_likelihood[,c(1,3)], type = "l", main = "likelihood w/ prior")
+
 
 preds <- predict(m, newdata = dtm, iterations = 1000, burnin = 900)
 
